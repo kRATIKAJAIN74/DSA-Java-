@@ -1,3 +1,4 @@
+package Basic;
 public class ArithmeticOperators {
     public static void main(String[] args) {
         int p = 20, q = 10;
