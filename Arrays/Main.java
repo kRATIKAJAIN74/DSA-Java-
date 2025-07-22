@@ -1,22 +1,20 @@
 package Arrays;
 
- class ArraysExample {
-    void demoArrays(){
-    int ages [] = new int[5];
-    float weights [] = new float[3];
-
-    ages[0]=34;
-    ages[1]=35;
-    ages[2]=23;
-    // ages[5]=45;
-    System.out.println(ages[0]);
-    System.out.println(ages[1]);
-    System.out.println(ages[2]);
-    }
-}
 public class Main {
+    void sumOfArray() {
+        int arr[] = {1, 2, 3, 4, 5, 6};
+        int sum = 0;
+
+        for (int i = 0; i < arr.length; i++) {
+            System.out.println(arr[i]);
+            sum = sum + arr[i];
+        }
+
+        System.out.println("Sum: " + sum);
+    }
+
     public static void main(String[] args) {
-        ArraysExample obj = new ArraysExample();
-        obj.demoArrays();
+        Main obj = new Main();
+        obj.sumOfArray();
     }
 }

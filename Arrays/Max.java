@@ -17,4 +17,5 @@ public static void main(String[] args) {
     MaxValue obj = new MaxValue();
     obj.MaxOfArray();
 }
+
 }

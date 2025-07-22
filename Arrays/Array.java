@@ -15,7 +15,7 @@
 }
 public class Array {
     public static void main(String[] args) {
-        SumArrays obj = new SumArrays();
+        Main obj = new Main();
         obj.sumOfArray();
     }
 }
