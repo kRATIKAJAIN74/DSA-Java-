@@ -1,0 +1,424 @@
+import javax.swing.*;
+import javax.swing.border.EmptyBorder;
+import java.awt.*;
+import java.awt.event.*;
+import java.io.*;
+import java.util.*;
+import java.util.List;
+
+/**
+ * AlbumManagerGUI
+ * Single-file Swing GUI version of Album Manager.
+ * Uses albums.dat (serialization) to persist data (same file used by console app).
+ *
+ * Compile: javac AlbumManagerGUI.java
+ * Run:     java AlbumManagerGUI
+ */
+public class AlbumManagerGUI extends JFrame {
+    private static final String DATA_FILE = "albums.dat";
+
+    private DefaultListModel<Album> listModel = new DefaultListModel<>();
+    private JList<Album> albumJList = new JList<>(listModel);
+    private JTextArea detailsArea = new JTextArea();
+    private List<Album> albums = new ArrayList<>();
+
+    public static void main(String[] args) {
+        SwingUtilities.invokeLater(() -> {
+            AlbumManagerGUI gui = new AlbumManagerGUI();
+            gui.setVisible(true);
+        });
+    }
+
+    public AlbumManagerGUI() {
+        setTitle("🎵 Album Manager (GUI)");
+        setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
+        setSize(800, 500);
+        setLocationRelativeTo(null);
+        setLayout(new BorderLayout(8, 8));
+        ((JComponent) getContentPane()).setBorder(new EmptyBorder(8,8,8,8));
+
+        loadFromFile();
+
+        initComponents();
+        addWindowListener(new WindowAdapter() {
+            public void windowClosing(WindowEvent e) {
+                exitAndSave();
+            }
+        });
+    }
+
+    private void initComponents() {
+        // Left panel: album list + search
+        JPanel left = new JPanel(new BorderLayout(6,6));
+        left.setPreferredSize(new Dimension(320, 400));
+        JLabel listLabel = new JLabel("Albums");
+        listLabel.setFont(listLabel.getFont().deriveFont(Font.BOLD, 14f));
+        left.add(listLabel, BorderLayout.NORTH);
+
+        albumJList.setSelectionMode(ListSelectionModel.SINGLE_SELECTION);
+        albumJList.setCellRenderer(new AlbumCellRenderer());
+        albumJList.addListSelectionListener(e -> showSelectedAlbum());
+        JScrollPane listScroll = new JScrollPane(albumJList);
+        left.add(listScroll, BorderLayout.CENTER);
+
+        JPanel searchPane = new JPanel(new BorderLayout(6,6));
+        JTextField searchField = new JTextField();
+        JButton searchBtn = new JButton("🔍 Search");
+        searchBtn.addActionListener(evt -> searchAlbums(searchField.getText().trim()));
+        searchField.addActionListener(evt -> searchBtn.doClick());
+        searchPane.add(searchField, BorderLayout.CENTER);
+        searchPane.add(searchBtn, BorderLayout.EAST);
+        left.add(searchPane, BorderLayout.SOUTH);
+
+        add(left, BorderLayout.WEST);
+
+        // Right panel: details + buttons
+        JPanel right = new JPanel(new BorderLayout(6,6));
+        JLabel detailsLabel = new JLabel("Details");
+        detailsLabel.setFont(detailsLabel.getFont().deriveFont(Font.BOLD, 14f));
+        right.add(detailsLabel, BorderLayout.NORTH);
+
+        detailsArea.setEditable(false);
+        detailsArea.setFont(new Font(Font.MONOSPACED, Font.PLAIN, 12));
+        detailsArea.setMargin(new Insets(6,6,6,6));
+        JScrollPane detailsScroll = new JScrollPane(detailsArea);
+        right.add(detailsScroll, BorderLayout.CENTER);
+
+        JPanel btnPanel = new JPanel(new GridLayout(2,4,8,8));
+        JButton addBtn = new JButton("➕ Add");
+        JButton editBtn = new JButton("✏ Edit");
+        JButton deleteBtn = new JButton("🗑 Delete");
+        JButton addTrackBtn = new JButton("➕ Track");
+        JButton removeTrackBtn = new JButton("➖ Track");
+        JButton saveBtn = new JButton("💾 Save");
+        JButton refreshBtn = new JButton("🔁 Refresh");
+        JButton exitBtn = new JButton("🚪 Exit");
+
+        addBtn.addActionListener(e -> onAddAlbum());
+        editBtn.addActionListener(e -> onEditAlbum());
+        deleteBtn.addActionListener(e -> onDeleteAlbum());
+        addTrackBtn.addActionListener(e -> onAddTrack());
+        removeTrackBtn.addActionListener(e -> onRemoveTrack());
+        saveBtn.addActionListener(e -> { saveToFile(); JOptionPane.showMessageDialog(this, "Saved."); });
+        refreshBtn.addActionListener(e -> refreshList());
+        exitBtn.addActionListener(e -> exitAndSave());
+
+        btnPanel.add(addBtn);
+        btnPanel.add(editBtn);
+        btnPanel.add(deleteBtn);
+        btnPanel.add(addTrackBtn);
+        btnPanel.add(removeTrackBtn);
+        btnPanel.add(saveBtn);
+        btnPanel.add(refreshBtn);
+        btnPanel.add(exitBtn);
+
+        right.add(btnPanel, BorderLayout.SOUTH);
+
+        add(right, BorderLayout.CENTER);
+
+        refreshList();
+        if (!listModel.isEmpty()) albumJList.setSelectedIndex(0);
+    }
+
+    private void showSelectedAlbum() {
+        Album a = albumJList.getSelectedValue();
+        if (a == null) {
+            detailsArea.setText("");
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        sb.append("📀 ").append(a.getTitle()).append("  —  ").append(a.getArtist()).append("\n");
+        sb.append("ID: ").append(a.getId()).append("\n");
+        sb.append("Year: ").append(a.getYear() == null ? "-" : a.getYear()).append("\n");
+        sb.append("Genre: ").append(a.getGenre() == null ? "-" : a.getGenre()).append("\n");
+        sb.append("\nTracks:\n");
+        if (a.getTracks().isEmpty()) sb.append("  (no tracks)\n");
+        else {
+            int i = 1;
+            for (Track t : a.getTracks()) {
+                sb.append(String.format("  %02d. %s %s\n", i++, t.getTitle(), (t.getDuration()==null||t.getDuration().isEmpty()?"":("("+t.getDuration()+")"))));
+            }
+        }
+        detailsArea.setText(sb.toString());
+    }
+
+    private void onAddAlbum() {
+        AlbumForm form = new AlbumForm(this, "Add Album", null);
+        Album created = form.showDialog();
+        if (created != null) {
+            albums.add(created);
+            refreshList();
+            albumJList.setSelectedValue(created, true);
+            saveToFile();
+        }
+    }
+
+    private void onEditAlbum() {
+        Album sel = albumJList.getSelectedValue();
+        if (sel == null) { JOptionPane.showMessageDialog(this, "Select an album first."); return; }
+        AlbumForm form = new AlbumForm(this, "Edit Album", sel);
+        Album updated = form.showDialog();
+        if (updated != null) {
+            // updated object is already a reference to sel; refresh UI
+            refreshList();
+            albumJList.setSelectedValue(sel, true);
+            saveToFile();
+        }
+    }
+
+    private void onDeleteAlbum() {
+        Album sel = albumJList.getSelectedValue();
+        if (sel == null) { JOptionPane.showMessageDialog(this, "Select an album first."); return; }
+        int ans = JOptionPane.showConfirmDialog(this, "Delete '" + sel.getTitle() + "'?", "Confirm", JOptionPane.YES_NO_OPTION);
+        if (ans == JOptionPane.YES_OPTION) {
+            albums.remove(sel);
+            refreshList();
+            saveToFile();
+        }
+    }
+
+    private void onAddTrack() {
+        Album sel = albumJList.getSelectedValue();
+        if (sel == null) { JOptionPane.showMessageDialog(this, "Select an album first."); return; }
+        TrackForm tf = new TrackForm(this, "Add Track", null);
+        Track t = tf.showDialog();
+        if (t != null) {
+            sel.getTracks().add(t);
+            refreshList();
+            albumJList.setSelectedValue(sel, true);
+            saveToFile();
+        }
+    }
+
+    private void onRemoveTrack() {
+        Album sel = albumJList.getSelectedValue();
+        if (sel == null) { JOptionPane.showMessageDialog(this, "Select an album first."); return; }
+        if (sel.getTracks().isEmpty()) { JOptionPane.showMessageDialog(this, "No tracks to remove."); return; }
+
+        String[] trackNames = new String[sel.getTracks().size()];
+        for (int i = 0; i < sel.getTracks().size(); i++) {
+            Track t = sel.getTracks().get(i);
+            trackNames[i] = String.format("%02d. %s %s", i+1, t.getTitle(), (t.getDuration()==null?"":"("+t.getDuration()+")"));
+        }
+        String choice = (String) JOptionPane.showInputDialog(this, "Choose track to remove:", "Remove Track",
+                JOptionPane.PLAIN_MESSAGE, null, trackNames, trackNames[0]);
+        if (choice != null) {
+            int idx = Arrays.asList(trackNames).indexOf(choice);
+            if (idx >= 0) {
+                Track removed = sel.getTracks().remove(idx);
+                JOptionPane.showMessageDialog(this, "Removed: " + removed.getTitle());
+                refreshList();
+                albumJList.setSelectedValue(sel, true);
+                saveToFile();
+            }
+        }
+    }
+
+    private void searchAlbums(String term) {
+        if (term == null || term.isEmpty()) { refreshList(); return; }
+        String lower = term.toLowerCase();
+        List<Album> found = new ArrayList<>();
+        for (Album a : albums) {
+            if ((a.getTitle() != null && a.getTitle().toLowerCase().contains(lower))
+                || (a.getArtist() != null && a.getArtist().toLowerCase().contains(lower))) {
+                found.add(a);
+            }
+        }
+        listModel.clear();
+        for (Album a : found) listModel.addElement(a);
+        if (!found.isEmpty()) albumJList.setSelectedIndex(0);
+    }
+
+    private void refreshList() {
+        listModel.clear();
+        for (Album a : albums) listModel.addElement(a);
+        detailsArea.setText("");
+    }
+
+    private void exitAndSave() {
+        saveToFile();
+        dispose();
+        System.exit(0);
+    }
+
+    private void saveToFile() {
+        try (ObjectOutputStream oos = new ObjectOutputStream(new FileOutputStream(DATA_FILE))) {
+            oos.writeObject(albums);
+        } catch (IOException e) {
+            JOptionPane.showMessageDialog(this, "Save failed: " + e.getMessage());
+        }
+    }
+
+    @SuppressWarnings("unchecked")
+    private void loadFromFile() {
+        File f = new File(DATA_FILE);
+        if (!f.exists()) return;
+        try (ObjectInputStream ois = new ObjectInputStream(new FileInputStream(f))) {
+            Object obj = ois.readObject();
+            if (obj instanceof List) albums = (List<Album>) obj;
+        } catch (Exception ignored) {
+        }
+    }
+
+    // ---------- Helper inner classes & dialogs ----------
+
+    private static class AlbumCellRenderer extends JLabel implements ListCellRenderer<Album> {
+        public AlbumCellRenderer() { setOpaque(true); setBorder(new EmptyBorder(4,6,4,6)); }
+        public Component getListCellRendererComponent(JList<? extends Album> list, Album value, int index, boolean isSelected, boolean cellHasFocus) {
+            if (value == null) { setText(""); return this; }
+            String t = String.format("<html><b>%s</b> <small>by %s</small><br/><small>ID: %s | %s</small></html>",
+                    escape(value.getTitle()), escape(value.getArtist()), value.getId(), value.getYear()==null?"-":value.getYear());
+            setText(t);
+            setBackground(isSelected ? new Color(0xE8F0FF) : Color.WHITE);
+            setForeground(Color.DARK_GRAY);
+            return this;
+        }
+        private String escape(String s){ return s==null?"-":s.replaceAll("<","&lt;"); }
+    }
+
+    // Album/Track domain classes (Serializable)
+    private static class Album implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private String id, title, artist, genre;
+        private Integer year;
+        private List<Track> tracks = new ArrayList<>();
+        private static final Random R = new Random();
+        public Album(String title, String artist, Integer year, String genre) {
+            this.id = "ALB-" + Math.abs(R.nextInt(90000)+10000);
+            this.title = title == null ? "" : title;
+            this.artist = artist == null ? "" : artist;
+            this.year = year;
+            this.genre = genre;
+        }
+        public String getId(){ return id; }
+        public String getTitle(){ return title; }
+        public String getArtist(){ return artist; }
+        public Integer getYear(){ return year; }
+        public String getGenre(){ return genre; }
+        public List<Track> getTracks(){ return tracks; }
+        public void setTitle(String t){ this.title = t; }
+        public void setArtist(String a){ this.artist = a; }
+        public void setYear(Integer y){ this.year = y; }
+        public void setGenre(String g){ this.genre = g; }
+        @Override
+        public String toString(){ return title + " — " + artist; }
+    }
+
+    private static class Track implements Serializable {
+        private static final long serialVersionUID = 1L;
+        private String title, duration;
+        public Track(String title, String duration) { this.title = title==null?"":title; this.duration = duration; }
+        public String getTitle(){ return title; }
+        public String getDuration(){ return duration; }
+    }
+
+    // Album form dialog (add/edit)
+    private static class AlbumForm extends JDialog {
+        private JTextField titleF = new JTextField(30);
+        private JTextField artistF = new JTextField(30);
+        private JTextField yearF = new JTextField(6);
+        private JTextField genreF = new JTextField(20);
+        private Album result = null;
+
+        public AlbumForm(Frame owner, String title, Album existing) {
+            super(owner, title, true);
+            setLayout(new BorderLayout(8,8));
+            JPanel p = new JPanel(new GridLayout(0,2,6,6));
+            p.setBorder(new EmptyBorder(8,8,8,8));
+            p.add(new JLabel("🎼 Title:")); p.add(titleF);
+            p.add(new JLabel("🎤 Artist:")); p.add(artistF);
+            p.add(new JLabel("📅 Year:")); p.add(yearF);
+            p.add(new JLabel("🎧 Genre:")); p.add(genreF);
+            add(p, BorderLayout.CENTER);
+
+            JPanel bp = new JPanel();
+            JButton ok = new JButton("OK");
+            JButton cancel = new JButton("Cancel");
+            bp.add(ok); bp.add(cancel);
+            add(bp, BorderLayout.SOUTH);
+
+            if (existing != null) {
+                titleF.setText(existing.getTitle());
+                artistF.setText(existing.getArtist());
+                yearF.setText(existing.getYear() == null ? "" : existing.getYear().toString());
+                genreF.setText(existing.getGenre());
+                ok.addActionListener(e -> {
+                    existing.setTitle(titleF.getText().trim());
+                    existing.setArtist(artistF.getText().trim());
+                    String y = yearF.getText().trim();
+                    existing.setYear(y.isEmpty() ? null : safeParseInt(y));
+                    existing.setGenre(genreF.getText().trim());
+                    result = existing;
+                    setVisible(false);
+                });
+            } else {
+                ok.addActionListener(e -> {
+                    String t = titleF.getText().trim();
+                    String a = artistF.getText().trim();
+                    Integer y = yearF.getText().trim().isEmpty() ? null : safeParseInt(yearF.getText().trim());
+                    String g = genreF.getText().trim();
+                    if (t.isEmpty()) { JOptionPane.showMessageDialog(this, "Title required."); return; }
+                    result = new Album(t, a, y, g);
+                    setVisible(false);
+                });
+            }
+
+            cancel.addActionListener(e -> { result = null; setVisible(false); });
+
+            pack();
+            setLocationRelativeTo(owner);
+        }
+
+        private static Integer safeParseInt(String s) { try { return Integer.parseInt(s); } catch (Exception e) { return null; } }
+
+        public Album showDialog() {
+            setVisible(true);
+            return result;
+        }
+    }
+
+    // Track form dialog (add)
+    private static class TrackForm extends JDialog {
+        private JTextField titleF = new JTextField(30);
+        private JTextField durF = new JTextField(10);
+        private Track result = null;
+
+        public TrackForm(Frame owner, String title, Track existing) {
+            super(owner, title, true);
+            setLayout(new BorderLayout(8,8));
+            JPanel p = new JPanel(new GridLayout(0,2,6,6));
+            p.setBorder(new EmptyBorder(8,8,8,8));
+            p.add(new JLabel("🎶 Track title:")); p.add(titleF);
+            p.add(new JLabel("⏱ Duration:")); p.add(durF);
+            add(p, BorderLayout.CENTER);
+
+            JPanel bp = new JPanel();
+            JButton ok = new JButton("OK");
+            JButton cancel = new JButton("Cancel");
+            bp.add(ok); bp.add(cancel);
+            add(bp, BorderLayout.SOUTH);
+
+            if (existing != null) {
+                titleF.setText(existing.getTitle());
+                durF.setText(existing.getDuration());
+            }
+
+            ok.addActionListener(e -> {
+                String t = titleF.getText().trim();
+                if (t.isEmpty()) { JOptionPane.showMessageDialog(this, "Track title required."); return; }
+                result = new Track(t, durF.getText().trim());
+                setVisible(false);
+            });
+
+            cancel.addActionListener(e -> { result = null; setVisible(false); });
+
+            pack();
+            setLocationRelativeTo(owner);
+        }
+
+        public Track showDialog() {
+            setVisible(true);
+            return result;
+        }
+    }
+}
