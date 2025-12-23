@@ -106,25 +106,124 @@ public class LinkedList {
       size--;
       return val;
   }
+
+  public int iteSearch(int key){//O(n)
+    temp = head;
+    int i=0;
+    while(temp!=null){
+      if(temp.data == key){
+        return i;
+      }
+      temp = temp.next;
+      i++;
+    }
+    // not found
+    return -1;
+  }
+
+
+  public void reverse(){ //O(n)
+    Node prev = null;
+    Node curr = tail = head;
+    Node next;
+
+    while(curr!= null){
+      next = curr.next;
+      curr.next = prev;
+      prev = curr;
+      curr = next;
+    }
+    head = prev;
+  }
+
+  public void deleteNthfromEnd(int n){
+    int size = 0;
+    temp = head;
+    while(temp!= null){
+      temp = temp.next;
+      size++;
+    }
+    if(n == size){
+      head = head.next;// removeFirst
+      return;
+    }
+
+    //size-n
+    int i=1;
+    int iToFind = size-n;
+    Node prev = head;
+    while(i< iToFind){
+    prev = prev.next;
+    i++;
+
+    }
+    prev.next = prev.next.next;
+    return;
+
+  }
+
+
+  public Node findMid(Node head){ //helper
+  Node slow = head;
+  Node fast = head;
+  while(fast!=null && fast.next!=null){
+    slow = slow.next;//+1
+    fast = fast.next.next;//+2
+  }
+  return slow;// slow midnode
+  }
+
+  public boolean isPalindrome(){
+    if(head==null || head.next==null){
+      return true;
+    }
+    //step 1 - find mid
+  Node midNode = findMid(head);
+    //step 2 - 2nd half reverse
+  Node prev = null;
+  Node curr = midNode;
+  Node next;
+  while(curr!=null){
+    next = curr.next;
+    curr.next = prev;
+    prev = curr;
+    curr = next;
+  }
+  Node right = prev;//right half head
+  Node left  = head;//left half head
+
+    //step 3 - check 1st half == 2nd half
+    while(right!=null){
+      if(left.data!= right.data){
+        return false;
+      }
+      left = left.next;
+      right = right.next;
+    }
+    return true;
+  }
+
   public static void main(String[] args) {
     LinkedList ll = new LinkedList();
    
-    ll.addFirst(2);
+    // ll.addFirst(2);
   
-    ll.addFirst(1);
+    // ll.addFirst(1);
    
-    ll.addLast(4);
-   
-    ll.addLast(5);
+    ll.addLast(1);
+    ll.addLast(2);
+     ll.addLast(5);
+    ll.addLast(1);
     
-    ll.midAdd(2, 3);
-    ll.printLL();
-    // System.out.println(ll.size);
-    ll.remFirst();
-    ll.printLL();
-    ll.remLast();
-    ll.printLL();
-    System.out.println( "size " + ll.size);
+    // ll.midAdd(2, 3);
+    // ll.printLL();
+    // ll.reverse();
+    // ll.printLL();
+    // ll.deleteNthfromEnd(3);
+
+    ll.printLL();//1->2->2->1
+    System.out.println(ll.isPalindrome());
+    
   }
   
 }
