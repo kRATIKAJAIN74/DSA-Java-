@@ -36,6 +36,13 @@ public class StackB {
       head = head.next;
       return top;
      }
+     //peek
+     public static int peek(){
+      if(isEmpty()){
+        return -1;
+      }
+      return head.data;
+     }
      
 
 
