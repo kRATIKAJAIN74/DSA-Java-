@@ -74,6 +74,25 @@ public static Node findInorderSuccessor(Node root){
   }
   return root;
 }
+
+//Root to leaf
+public static void printRoot2Leaf(Node root,ArrayList<Integer> path){
+  if(root == null) return;
+  if(root.left==null && root.right==null){
+    printPath(path);
+  }
+  path.add(root.data);
+  printRoot2Leaf(root.left, path);
+  printRoot2Leaf(root.right, path);
+  path.remove(path.size()-1);
+}
+
+public static void printPath(ArrayList<Integer> path){
+  for(int i=0;i<path.size();i++){
+    System.out.print(path.get(i)+"->");
+  }
+  System.out.println("Null");
+}
   public static void main(String[] args) {
     int values[] = {8,5,3,1,4,6,10,11,14};
     Node root = null;
@@ -87,8 +106,9 @@ public static Node findInorderSuccessor(Node root){
     // } else {
     //   System.out.println("not found");
     // }
-    root = delete(root, 1);
-    System.out.println();
+   
     inOrder(root);
+     System.out.println();
+     printRoot2Leaf(root, new ArrayList<>());
   }
 }
