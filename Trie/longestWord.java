@@ -1,4 +1,4 @@
-package Trie;
+
 
 public class longestWord {
    static class Node {

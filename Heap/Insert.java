@@ -1,4 +1,4 @@
-package Heap;
+
 import java.util.*;
 public class Insert {
   static class heap{
